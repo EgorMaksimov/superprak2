@@ -1,6 +1,6 @@
 #include <iostream>
 #include <stdexcept>
-#include <math.h> 
+#include <math.h>
 #include <cmath>
 #include <mpi.h>
 #include <string>
@@ -22,24 +22,11 @@ string from_int(int number) {
 }
 
 double F(const double x, const double y) {
-    double t = 1.0 + 1.0*x*y;
-    if (t == 0)
-    	throw std::runtime_error("Error in computing 'F' function");
-    return (x*x + y*y)/(t*t);
+    return 4*(2 - 3*x*x - 3*y*y);
 }
 
 double phi(const double x, const double y) {
-    double t = 1.0 + 1.0 * x*y;
-    if (t <= 0)
-        throw std::runtime_error("Error in computing 'phi' function");
-    return log(t);
-}
-
-double f_grid(const double t) {
-	double q = 1.5;
-	if (t < 0 || t > 1)
-		throw std::runtime_error("Error in computing 'f_grid' function");
-	return (pow(1.0 + t, q) - 1.0) / (pow(2.0, q) - 1.0);
+    return (1 - x*x)*(1 - x*x) + (1 - y*y)*(1 - y*y);
 }
 
 void compute_grid_processes_number(const int& size, int& x_proc_num, int& y_proc_num) {
@@ -91,11 +78,11 @@ struct GridParameters {
     MPI_Comm comm;
 
 	GridParameters (int rank, MPI_Comm comm, double* x_grid, double* y_grid, int N1, int N2, int p1, int p2, double eps):
-		rank (rank), comm (comm), x_grid (x_grid), y_grid (y_grid), 
+		rank (rank), comm (comm), x_grid (x_grid), y_grid (y_grid),
 		send_message_top (NULL), send_message_bottom (NULL), send_message_left (NULL), send_message_right (NULL),
 		recv_message_top (NULL), recv_message_bottom (NULL), recv_message_left (NULL), recv_message_right (NULL),
 		send_requests (NULL), recv_requests (NULL),
-		N1 (N1), N2 (N2),p1 (p1), p2 (p2), eps (eps), 
+		N1 (N1), N2 (N2),p1 (p1), p2 (p2), eps (eps),
 		x_index_from (0), x_index_to (0), y_index_from (0), y_index_to (0),
 		top (false), bottom (false), left (false), right (false) {
 			int step1, step2;
@@ -107,7 +94,7 @@ struct GridParameters {
 			if ((rank + 1) % p2 == 0)
 				y_index_to = N2;
 			else
-				y_index_to = y_index_from + step2; 
+				y_index_to = y_index_from + step2;
 
 			if (rank >= (p1-1)*p2)
 				x_index_to = N1;
@@ -125,14 +112,14 @@ struct GridParameters {
 		}
 
 	int get_num_x_points() {
-		if (bottom) 
+		if (bottom)
 			return x_index_to - x_index_from + 1;
 		else
 			return x_index_to - x_index_from;
 	}
 
 	int get_num_y_points() {
-		if (right) 
+		if (right)
 			return y_index_to - y_index_from + 1;
 		else
 			return y_index_to - y_index_from;
@@ -215,8 +202,8 @@ void compute_delta(GridParameters gp, const double *func, double *delta_func, do
 	double average_hx = (h_i + h_i_1) / 2.0;
 	double average_hy = (h_j + h_j_1) / 2.0;
 	double f_curr = func[i*gp.get_num_y_points()+j];
-	delta_func[i*gp.get_num_y_points()+j] = 
-		(1.0 / average_hx) * ((f_curr - f_top) / h_i_1 - (f_bottom - f_curr) / h_i) + 
+	delta_func[i*gp.get_num_y_points()+j] =
+		(1.0 / average_hx) * ((f_curr - f_top) / h_i_1 - (f_bottom - f_curr) / h_i) +
 		(1.0 / average_hy) * ((f_curr - f_left) / h_j_1 - (f_right - f_curr) / h_j);
 	//printf("i=%d j=%d grid_i=%d grid_j=%d average_hx=%f average_hy=%f h_i_1=%f h_i=%f h_j_1=%f h_j=%f f_curr=%f f_top=%f f_bottom=%f f_left=%f f_right=%f delta_func[i][j] = %f\n", i, j, grid_i, grid_j, average_hx, average_hy, h_i_1, h_i, h_j_1, h_j, f_curr, f_top, f_bottom, f_left, f_right, delta_func[i*gp.get_num_y_points()+j]);
 }
@@ -227,7 +214,7 @@ enum MPI_tags { SendToTop, SendToBottom, SendToLeft, SendToRight};
 void compute_approx_delta(GridParameters gp, double* delta_func, const double* func) {
 	// compute inner points
 	int i, j;
-	#pragma omp parallel for 
+	#pragma omp parallel for
 	for (i=1; i<gp.get_num_x_points()-1; i++) {
     	for (j=1; j<gp.get_num_y_points()-1; j++) {
     		int grid_i, grid_j;
@@ -271,25 +258,25 @@ void compute_approx_delta(GridParameters gp, double* delta_func, const double* f
 	int status;
 	int send_count=0;
 	if (not gp.top) {
-		status = MPI_Isend(gp.send_message_top, gp.get_num_y_points(), MPI_DOUBLE, 
+		status = MPI_Isend(gp.send_message_top, gp.get_num_y_points(), MPI_DOUBLE,
 			gp.get_top_rank(), SendToTop, gp.comm, &(gp.send_requests[send_count]));
 		if (status != MPI_SUCCESS) throw std::runtime_error("Error in send message!");
 		send_count++;
 	}
 	if (not gp.bottom) {
-		status = MPI_Isend(gp.send_message_bottom, gp.get_num_y_points(), MPI_DOUBLE, 
+		status = MPI_Isend(gp.send_message_bottom, gp.get_num_y_points(), MPI_DOUBLE,
 			gp.get_bottom_rank(), SendToBottom, gp.comm, &(gp.send_requests[send_count]));
 		if (status != MPI_SUCCESS) throw std::runtime_error("Error in send message!");
 		send_count++;
 	}
 	if (not gp.left) {
-		status = MPI_Isend(gp.send_message_left, gp.get_num_x_points(), MPI_DOUBLE, 
+		status = MPI_Isend(gp.send_message_left, gp.get_num_x_points(), MPI_DOUBLE,
 			gp.get_left_rank(), SendToLeft, gp.comm, &(gp.send_requests[send_count]));
 		if (status != MPI_SUCCESS) throw std::runtime_error("Error in send message!");
 		send_count++;
 	}
 	if (not gp.right) {
-		status = MPI_Isend(gp.send_message_right, gp.get_num_x_points(), MPI_DOUBLE, 
+		status = MPI_Isend(gp.send_message_right, gp.get_num_x_points(), MPI_DOUBLE,
 			gp.get_right_rank(), SendToRight, gp.comm, &(gp.send_requests[send_count]));
 		if (status != MPI_SUCCESS) throw std::runtime_error("Error in send message!");
 		send_count++;
@@ -297,25 +284,25 @@ void compute_approx_delta(GridParameters gp, double* delta_func, const double* f
 
 	int recv_count=0;
 	if (not gp.top) {
-		status = MPI_Irecv(gp.recv_message_top, gp.get_num_y_points(), MPI_DOUBLE, 
+		status = MPI_Irecv(gp.recv_message_top, gp.get_num_y_points(), MPI_DOUBLE,
 			gp.get_top_rank(), SendToBottom, gp.comm, &(gp.recv_requests[recv_count]));
 		if (status != MPI_SUCCESS) throw std::runtime_error("Error in receive message!");
 		recv_count++;
 	}
 	if (not gp.bottom) {
-		status = MPI_Irecv(gp.recv_message_bottom, gp.get_num_y_points(), MPI_DOUBLE, 
+		status = MPI_Irecv(gp.recv_message_bottom, gp.get_num_y_points(), MPI_DOUBLE,
 			gp.get_bottom_rank(), SendToTop, gp.comm, &(gp.recv_requests[recv_count]));
 		if (status != MPI_SUCCESS) throw std::runtime_error("Error in receive message!");
 		recv_count++;
 	}
 	if (not gp.left) {
-		status = MPI_Irecv(gp.recv_message_left, gp.get_num_x_points(), MPI_DOUBLE, 
+		status = MPI_Irecv(gp.recv_message_left, gp.get_num_x_points(), MPI_DOUBLE,
 			gp.get_left_rank(), SendToRight, gp.comm, &(gp.recv_requests[recv_count]));
 		if (status != MPI_SUCCESS) throw std::runtime_error("Error in receive message!");
 		recv_count++;
 	}
 	if (not gp.right) {
-		status = MPI_Irecv(gp.recv_message_right, gp.get_num_x_points(), MPI_DOUBLE, 
+		status = MPI_Irecv(gp.recv_message_right, gp.get_num_x_points(), MPI_DOUBLE,
 			gp.get_right_rank(), SendToLeft, gp.comm, &(gp.recv_requests[recv_count]));
 		if (status != MPI_SUCCESS) throw std::runtime_error("Error in receive message!");
 		recv_count++;
@@ -396,14 +383,14 @@ void compute_approx_delta(GridParameters gp, double* delta_func, const double* f
 void compute_r(GridParameters gp, double *r, const double *delta_p) {
 	int i, j;
 
-	#pragma omp parallel for 
+	#pragma omp parallel for
 	for (i=0; i<gp.get_num_x_points(); i++) {
     	for (j=0; j<gp.get_num_y_points(); j++) {
     		int grid_i, grid_j;
     		gp.get_real_grid_index(i, j, grid_i, grid_j);
     		if (gp.is_border_point(grid_i, grid_j))
 				r[i*gp.get_num_y_points()+j] = 0.0;
-    		else 
+    		else
     			r[i*gp.get_num_y_points()+j] = delta_p[i*gp.get_num_y_points()+j] - F(gp.get_x_grid_value(grid_i), gp.get_y_grid_value(grid_j));
     	}
 	}
@@ -412,7 +399,7 @@ void compute_r(GridParameters gp, double *r, const double *delta_p) {
 void compute_g(GridParameters gp, double *g, double *r, double alpha) {
 	int i, j;
 
-	#pragma omp parallel for 
+	#pragma omp parallel for
 	for (i=0; i<gp.get_num_x_points(); i++) {
     	for (j=0; j<gp.get_num_y_points(); j++) {
     		int grid_i, grid_j;
@@ -425,7 +412,7 @@ void compute_g(GridParameters gp, double *g, double *r, double alpha) {
 void compute_p(GridParameters gp, double *p, double* p_prev, double *g, double tau) {
 	int i, j;
 
-	#pragma omp parallel for 
+	#pragma omp parallel for
 	for (i=0; i<gp.get_num_x_points(); i++) {
     	for (j=0; j<gp.get_num_y_points(); j++) {
     		int grid_i, grid_j;
@@ -440,16 +427,17 @@ double compute_norm(GridParameters gp, double *p, double *p_prev) {
 	double norm_shared = 0.0;
 
 	int i, j;
-	#pragma omp parallel shared(norm_shared) firstprivate(norm) 
+	#pragma omp parallel shared(norm_shared) firstprivate(norm)
 	{
 		for (i=0; i<gp.get_num_x_points(); i++) {
 	    	for (j=0; j<gp.get_num_y_points(); j++) {
 	    		int grid_i, grid_j;
 	    		gp.get_real_grid_index(i, j, grid_i, grid_j);
-	    		norm = max(norm, abs(p[i*gp.get_num_y_points()+j] - p_prev[i*gp.get_num_y_points()+j]));
+	    		norm = norm + (p[i*gp.get_num_y_points()+j])*(p[i*gp.get_num_y_points()+j]) - (p_prev[i*gp.get_num_y_points()+j])*(p_prev[i*gp.get_num_y_points()+j]);
 	    	}
 		}
-		#pragma omp critical 
+		norm = sqrt(norm);
+		#pragma omp critical
 	  	{
 	      if(norm > norm_shared) norm_shared = norm;
 		}
@@ -465,7 +453,7 @@ double compute_norm(GridParameters gp, double *p, double *p_prev) {
 void init_vector(GridParameters gp, double* func) {
 	int i, j;
 
-	#pragma omp parallel for 
+	#pragma omp parallel for
 	for (i=0; i<gp.get_num_x_points(); i++) {
     	for (j=0; j<gp.get_num_y_points(); j++) {
     		int grid_i, grid_j;
@@ -478,7 +466,7 @@ void init_vector(GridParameters gp, double* func) {
 void init_p_prev(GridParameters gp, double* p_prev) {
 	int i, j;
 
-	#pragma omp parallel for 
+	#pragma omp parallel for
 	for (i=0; i<gp.get_num_x_points(); i++) {
     	for (j=0; j<gp.get_num_y_points(); j++) {
     		int grid_i, grid_j;
@@ -494,7 +482,7 @@ void init_p_prev(GridParameters gp, double* p_prev) {
 }
 
 void write_func_to_file(GridParameters gp, double *func, string func_name) {
-	std::string name= "output/"+func_name + "_" + from_int(gp.rank) + ".txt"; 
+	std::string name= "output/"+func_name + "_" + from_int(gp.rank) + ".txt";
 	std::fstream fout (name.c_str(), fstream::out);
 	for (int i=0; i<gp.get_num_x_points(); i++) {
     	for (int j=0; j<gp.get_num_y_points(); j++) {
@@ -506,7 +494,7 @@ void write_func_to_file(GridParameters gp, double *func, string func_name) {
 }
 
 void write_two_func_to_file(GridParameters gp, double *func1, string func1_name, double *func2, string func2_name) {
-	std::string name= "output/"+ func1_name + "_" + from_int(gp.rank) + ".txt"; 
+	std::string name= "output/"+ func1_name + "_" + from_int(gp.rank) + ".txt";
 	std::fstream fout (name.c_str(), fstream::out);
 
 	fout << "x,y," << func1_name << "," << func2_name << endl;
@@ -525,10 +513,10 @@ int main (int argc, char** argv) {
 		throw std::runtime_error("Incorrect number of arguments");
 	clock_t begin = clock();
 
-	const double A1 = 0.0;
-	const double A2 = 3.0;
-	const double B1 = 0.0;
-	const double B2 = 3.0;
+	const double A1 = -1.0;
+	const double A2 = 1.0;
+	const double B1 = -1.0;
+	const double B2 = 1.0;
 
 	const int N1 = atoi(argv[1]);
 	const int N2 = atoi(argv[2]);
@@ -538,11 +526,11 @@ int main (int argc, char** argv) {
 	double* y_grid = new double [N2+1];
 
 	for (int i=0; i<=N1; i++) {
-		x_grid[i] = A2 * f_grid(1.0*i/N1) + A1 * (1 - f_grid(1.0*i/N1));
+		x_grid[i] = A2 * (1.0*i/N1) + A1 * (1 - (1.0*i/N1));
 		//std::cout << "x_grid[" << i << "]=" << x_grid[i] << std::endl;
 	}
 	for (int j=0; j<=N2; j++) {
-		y_grid[j] = B2 * f_grid(1.0*j/N2) + B1 * (1 - f_grid(1.0*j/N2));
+		y_grid[j] = B2 * (1.0*j/N2) + B1 * (1 - (1.0*j/N2));
 		//std::cout << "y_grid[" << j << "]=" << y_grid[j] << std::endl;
 	}
 
@@ -566,13 +554,13 @@ int main (int argc, char** argv) {
 			std::cout << "p1=" << p1 << " p2=" << p2 << " size=" << size << std::endl;
 	    }
 		//printf( "Hello world from process %d of %d\n", rank, size );
-	    //printf("rank %d: x_index_from = %d  x_index_to = %d  y_index_from = %d y_index_to = %d  top=%d bottom=%d left=%d right=%d\n", 
+	    //printf("rank %d: x_index_from = %d  x_index_to = %d  y_index_from = %d y_index_to = %d  top=%d bottom=%d left=%d right=%d\n",
 	    // 	rank, x_index_from, x_index_to, y_index_from, y_index_to, );
 
 	    GridParameters gp(rank, MPI_COMM_WORLD, x_grid, y_grid, N1, N2, p1, p2, eps);
-	   	//printf("rank %d: x_index_from = %d  x_index_to = %d  y_index_from = %d y_index_to = %d  top=%d bottom=%d left=%d right=%d\n", 
+	   	//printf("rank %d: x_index_from = %d  x_index_to = %d  y_index_from = %d y_index_to = %d  top=%d bottom=%d left=%d right=%d\n",
 	    //	gp.rank, gp.x_index_from, gp.x_index_to, gp.y_index_from, gp.y_index_to, gp.top, gp.bottom, gp.left, gp.right);
-	    
+
 	    double* p = new double [gp.get_num_x_points() * gp.get_num_y_points()];
 	    double* p_prev = new double [gp.get_num_x_points() * gp.get_num_y_points()];
 	    double* g = new double [gp.get_num_x_points() * gp.get_num_y_points()];
@@ -580,7 +568,7 @@ int main (int argc, char** argv) {
 	    double* delta_p = new double [gp.get_num_x_points() * gp.get_num_y_points()];
 	    double* delta_r = new double [gp.get_num_x_points() * gp.get_num_y_points()];
 	    double* delta_g = new double [gp.get_num_x_points() * gp.get_num_y_points()];
-	    
+
 	    init_p_prev(gp, p_prev);
 
 	    init_vector(gp, r);
@@ -615,9 +603,9 @@ int main (int argc, char** argv) {
 	    		alpha = 1.0 * scalar_product_delta_r_and_g / scalar_product_delta_g_and_g;
 	    	}
 
-	    	if (n_iter > 1) 
+	    	if (n_iter > 1)
 	    		compute_g(gp, g, r, alpha);
-	    	else 
+	    	else
             	std::swap(g, r);
 
             compute_approx_delta(gp, delta_g, g);
